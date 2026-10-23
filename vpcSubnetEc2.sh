@@ -8,7 +8,7 @@ echo "2 Crear VPC, Subnet e Instancia EC2"
 echo "Ingrese el número de la opción que desea ejecutar (1 o 2):"
 read opcion
 
-if [ $opcion -ne 1 ] && [ $opcion -ne 2 ]; then
+if [ "$opcion" != "1" ] && [ "$opcion" != "2" ]; then
     echo "Opción inválida. Por favor, elija 1 o 2."
     exit 1
 fi
@@ -47,7 +47,25 @@ else
     echo "No se encontró ninguna Subnet con el nombre Script-Subnet."
 fi
 
-# 3. Buscar y eliminar la VPC por nombre
+# 3. Buscar y eliminar el Security Group por nombre
+SG_ID=$(aws ec2 describe-security-groups \
+    --filters "Name=tag:Name,Values=Script-SG" \
+    --query "SecurityGroups[].GroupId" \
+    --output text)
+
+if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+    echo "Eliminando Security Group: $SG_ID"
+    # El grupo puede tardar unos segundos en liberarse al terminar la instancia
+    for intento in 1 2 3 4 5; do
+        aws ec2 delete-security-group --group-id $SG_ID && break
+        echo "Reintentando en 5 segundos..."
+        sleep 5
+    done
+else
+    echo "No se encontró ningún Security Group con el nombre Script-SG."
+fi
+
+# 4. Buscar y eliminar la VPC por nombre
 VPC_ID=$(aws ec2 describe-vpcs \
     --filters "Name=tag:Name,Values=Script-VPC" \
     --query "Vpcs[].VpcId" \
@@ -73,10 +91,13 @@ if [ $opcion -eq 2 ]; then
 
 VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 \
 --query 'Vpc.VpcId' \
---tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=Script-VPC},{Key=Environment,Value=Script}]'  \
+--tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=Script-VPC},{Key=Environment,Value=Script}]' \
 --output text) 
 echo $VPC_ID
 
+#Dns support and DNS hostnames
+aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support "{\"Value\":true}"
+aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames "{\"Value\":true}"
 
 #Crear Subnet
 SUBNET_ID=$(aws ec2 create-subnet \
@@ -88,6 +109,26 @@ SUBNET_ID=$(aws ec2 create-subnet \
 echo $SUBNET_ID
 
 
+# Crear Security Group
+SG_ID=$(aws ec2 create-security-group \
+--group-name Script-SG \
+--description "Security group for Script" \
+--vpc-id $VPC_ID \
+--query 'GroupId' \
+--tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=Script-SG},{Key=Environment,Value=Script}]' \
+--output text)
+echo $SG_ID
+
+aws ec2 authorize-security-group-ingress \
+--group-id $SG_ID \
+--protocol tcp \
+--port 22 \
+--cidr 0.0.0.0/0 
+
+aws ec2 create-tags \
+--resources $SG_ID \
+--tags Key=Name,Value=Script-SG Key=Environment,Value=Script
+
 
 #Crear intancia EC2
 INSTANCE_ID=$(aws ec2 run-instances \
@@ -96,6 +137,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
 --key-name vockey --subnet-id $SUBNET_ID \
 --query 'Instances[0].InstanceId' \
 --associate-public-ip-address \
+--security-group-ids $SG_ID \
 --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance},{Key=Environment,Value=Script}]' \
 --output text) 
 echo $INSTANCE_ID
