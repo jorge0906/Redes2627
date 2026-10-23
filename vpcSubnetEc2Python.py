@@ -14,7 +14,7 @@ def crear_vpc():
     # Agregar etiquetas a la VPC
     ec2.create_tags(Resources=[vpc_id], Tags=[{'Key': 'Name', 'Value': 'Script-VPC'}, {'Key': 'Environment', 'Value': 'Script'}])
 
-    print(f"VPC creada con ID: {vpc_id}")
 
     return vpc_id
 
+print("VPC creada con ID:", crear_vpc())
