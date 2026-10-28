@@ -28,18 +28,36 @@ def crear_vpc():
         Tags=[{'Key': 'Name', 'Value': 'MiVPC-Boto3'}]
     )
 
-    # Crear subred dentro de la VPC
-    subnet = ec2.create_subnet(
-        VpcId=vpc_id,
-        CidrBlock='193.168.5.0/24'
-    )
-    subnet_id = subnet['Subnet']['SubnetId']
-    print(f"✅ Subred creada con ID: {subnet_id}")
+  
 
     print("🌐 DNS habilitado y etiqueta 'MiVPC-Boto3' asignada.")
     return vpc_id
 
 
+def crear_subnet(vpc_id):
+    # Crear cliente de EC2
+    ec2 = boto3.client('ec2')
+
+    # Crear la subred
+    subnet = ec2.create_subnet(
+        VpcId=vpc_id,
+        CidrBlock='193.168.5.0/24'
+    )
+
+    ec2.create_tags(
+        Resources=[subnet['Subnet']['SubnetId']],
+        Tags=[{'Key': 'Name', 'Value': 'MiSubred-Boto3'}]
+    )
+
+    subnet_id = subnet['Subnet']['SubnetId']
+    print(f"✅ Subred creada con ID: {subnet_id}")
+
+
+
+    return subnet_id
+
+
 if __name__ == "__main__":
     vpc_id = crear_vpc()
-    print(f"🚀 Proceso completado. ID de la VPC: {vpc_id}")
+    subnet_id = crear_subnet(vpc_id)
+    print(f"🚀 Proceso completado. ID de la VPC: {vpc_id}, ID de la Subred: {subnet_id}")
