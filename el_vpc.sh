@@ -1,3 +1,4 @@
+#!/bin/bash
 # Obtén los IDs de las VPCs que tienen la etiqueta entorno=prueba
 VPC_IDS=$(aws ec2 describe-vpcs \
     --filters "Name=tag:entorno,Values=prueba" \
@@ -22,3 +23,5 @@ for VPC_ID in $VPC_IDS; do
     aws ec2 delete-vpc --vpc-id $VPC_ID
     echo "VPC $VPC_ID eliminada."
 done
+
+exit 0
