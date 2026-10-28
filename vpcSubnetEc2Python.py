@@ -25,7 +25,7 @@ def crear_vpc():
     # Etiquetar la VPC (opcional)
     ec2.create_tags(
         Resources=[vpc_id],
-        Tags=[{'Key': 'Name', 'Value': 'MiVPC-Boto3'}]
+        Tags=[{'Key': 'Name', 'Value': 'MiVPC-Boto3'},{'Key': 'entorno', 'Value': 'prueba'}]
     )
 
   
@@ -46,7 +46,7 @@ def crear_subnet(vpc_id):
 
     ec2.create_tags(
         Resources=[subnet['Subnet']['SubnetId']],
-        Tags=[{'Key': 'Name', 'Value': 'MiSubred-Boto3'}]
+        Tags=[{'Key': 'Name', 'Value': 'MiSubred-Boto3'},{'Key': 'entorno', 'Value': 'prueba'}]
     )
 
     subnet_id = subnet['Subnet']['SubnetId']
@@ -70,7 +70,7 @@ def crear_Ec2_instance(subnet_id):
     )
     ec2.create_tags(
         Resources=[instance['Instances'][0]['InstanceId']],
-        Tags=[{'Key': 'Name', 'Value': 'MiInstancia-Boto3'}]
+        Tags=[{'Key': 'Name', 'Value': 'MiInstancia-Boto3'},{'Key': 'entorno', 'Value': 'prueba'}]
     )
 
     instance_id = instance['Instances'][0]['InstanceId']
