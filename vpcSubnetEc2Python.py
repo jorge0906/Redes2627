@@ -21,11 +21,20 @@ def crear_vpc():
         EnableDnsHostnames={'Value': True}
     )
 
+
     # Etiquetar la VPC (opcional)
     ec2.create_tags(
         Resources=[vpc_id],
         Tags=[{'Key': 'Name', 'Value': 'MiVPC-Boto3'}]
     )
+
+    # Crear subred dentro de la VPC
+    subnet = ec2.create_subnet(
+        VpcId=vpc_id,
+        CidrBlock='193.168.5.0/24'
+    )
+    subnet_id = subnet['Subnet']['SubnetId']
+    print(f"✅ Subred creada con ID: {subnet_id}")
 
     print("🌐 DNS habilitado y etiqueta 'MiVPC-Boto3' asignada.")
     return vpc_id
