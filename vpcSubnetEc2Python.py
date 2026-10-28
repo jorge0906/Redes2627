@@ -57,7 +57,30 @@ def crear_subnet(vpc_id):
     return subnet_id
 
 
+def crear_Ec2_instance(subnet_id):
+    # Crear cliente de EC2
+    ec2 = boto3.client('ec2')
+
+    # Crear la instancia EC2
+    instance = ec2.run_instances(
+        ImageId='ami-0c55b159cbfafe1f0',  # Cambia esto por la AMI que desees usar
+        InstanceType='t2.micro',
+        MaxCount=1,
+        MinCount=1
+    )
+    ec2.create_tags(
+        Resources=[instance['Instances'][0]['InstanceId']],
+        Tags=[{'Key': 'Name', 'Value': 'MiInstancia-Boto3'}]
+    )
+
+    instance_id = instance['Instances'][0]['InstanceId']
+    print(f"✅ Instancia EC2 creada con ID: {instance_id}")
+
+    return instance_id
+
+
 if __name__ == "__main__":
     vpc_id = crear_vpc()
     subnet_id = crear_subnet(vpc_id)
-    print(f"🚀 Proceso completado. ID de la VPC: {vpc_id}, ID de la Subred: {subnet_id}")
+    instance_id = crear_Ec2_instance(subnet_id)
+    print(f"🚀 Proceso completado. ID de la VPC: {vpc_id}, ID de la Subred: {subnet_id}, ID de la Instancia: {instance_id}")
