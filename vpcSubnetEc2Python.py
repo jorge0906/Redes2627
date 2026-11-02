@@ -63,7 +63,7 @@ def crear_Ec2_instance(subnet_id):
 
     # Crear la instancia EC2
     instance = ec2.run_instances(
-        ImageId='ami-0c55b159cbfafe1f0',  # Cambia esto por la AMI que desees usar
+        ImageId='ami-0b6d9d3d33ba97d99',  
         InstanceType='t2.micro',
         MaxCount=1,
         MinCount=1
