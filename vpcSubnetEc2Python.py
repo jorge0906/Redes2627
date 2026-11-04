@@ -1,8 +1,13 @@
 import boto3
 
+# Región y zona de disponibilidad donde se crean los recursos
+REGION = 'us-east-1'
+AZ = 'us-east-1a'
+
+
 def crear_vpc():
     # Crear cliente de EC2
-    ec2 = boto3.client('ec2')
+    ec2 = boto3.client('ec2', region_name=REGION)
 
     # Crear la VPC
     vpc = ec2.create_vpc(CidrBlock='193.168.5.0/16')
@@ -36,12 +41,13 @@ def crear_vpc():
 
 def crear_subnet(vpc_id):
     # Crear cliente de EC2
-    ec2 = boto3.client('ec2')
+    ec2 = boto3.client('ec2', region_name=REGION)
 
-    # Crear la subred
+    # Crear la subred en la zona de disponibilidad us-east-1a
     subnet = ec2.create_subnet(
         VpcId=vpc_id,
-        CidrBlock='193.168.5.0/24'
+        CidrBlock='193.168.5.0/24',
+        AvailabilityZone=AZ
     )
 
     ec2.create_tags(
@@ -50,7 +56,7 @@ def crear_subnet(vpc_id):
     )
 
     subnet_id = subnet['Subnet']['SubnetId']
-    print(f"✅ Subred creada con ID: {subnet_id}")
+    print(f"✅ Subred creada con ID: {subnet_id} en {AZ}")
 
 
 
@@ -59,7 +65,7 @@ def crear_subnet(vpc_id):
 
 def crear_internet_gateway(vpc_id):
     # Crear cliente de EC2
-    ec2 = boto3.client('ec2')
+    ec2 = boto3.client('ec2', region_name=REGION)
 
     # Crear el Internet Gateway
     igw = ec2.create_internet_gateway()
@@ -82,7 +88,7 @@ def crear_internet_gateway(vpc_id):
 
 def crear_tabla_rutas(vpc_id, igw_id, subnet_id):
     # Crear cliente de EC2
-    ec2 = boto3.client('ec2')
+    ec2 = boto3.client('ec2', region_name=REGION)
 
     # Crear la tabla de rutas
     route_table = ec2.create_route_table(VpcId=vpc_id)
@@ -110,16 +116,52 @@ def crear_tabla_rutas(vpc_id, igw_id, subnet_id):
     return route_table_id
 
 
-def crear_Ec2_instance(subnet_id):
+def crear_security_group(vpc_id):
     # Crear cliente de EC2
-    ec2 = boto3.client('ec2')
+    ec2 = boto3.client('ec2', region_name=REGION)
+
+    # Crear el Security Group en la VPC
+    sg = ec2.create_security_group(
+        GroupName='MiSG-Boto3',
+        Description='Security group para permitir SSH',
+        VpcId=vpc_id
+    )
+    sg_id = sg['GroupId']
+
+    # Permitir acceso SSH desde cualquier origen
+    ec2.authorize_security_group_ingress(
+        GroupId=sg_id,
+        IpPermissions=[
+            {
+                'IpProtocol': 'tcp',
+                'FromPort': 22,
+                'ToPort': 22,
+                'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
+            }
+        ]
+    )
+
+    ec2.create_tags(
+        Resources=[sg_id],
+        Tags=[{'Key': 'Name', 'Value': 'MiSG-Boto3'},{'Key': 'Type', 'Value': 'prueba'}]
+    )
+
+    print(f"✅ Security Group creado con ID: {sg_id} (SSH abierto)")
+    return sg_id
+
+
+def crear_Ec2_instance(subnet_id, security_group_id):
+    # Crear cliente de EC2
+    ec2 = boto3.client('ec2', region_name=REGION)
 
     # Crear la instancia EC2
     instance = ec2.run_instances(
         ImageId='ami-0b6d9d3d33ba97d99',  
         InstanceType='t2.micro',
         MaxCount=1,
-        MinCount=1
+        MinCount=1,
+        SubnetId=subnet_id,
+        SecurityGroupIds=[security_group_id]
     )
     ec2.create_tags(
         Resources=[instance['Instances'][0]['InstanceId']],
@@ -137,5 +179,6 @@ if __name__ == "__main__":
     subnet_id = crear_subnet(vpc_id)
     igw_id = crear_internet_gateway(vpc_id)
     route_table_id = crear_tabla_rutas(vpc_id, igw_id, subnet_id)
-    instance_id = crear_Ec2_instance(subnet_id)
-    print(f"🚀 Proceso completado. ID de la VPC: {vpc_id}, ID de la Subred: {subnet_id}, ID del Internet Gateway: {igw_id}, ID de la Tabla de Rutas: {route_table_id}, ID de la Instancia: {instance_id}")
+    sg_id = crear_security_group(vpc_id)
+    instance_id = crear_Ec2_instance(subnet_id, sg_id)
+    print(f"🚀 Proceso completado. ID de la VPC: {vpc_id}, ID de la Subred: {subnet_id}, ID del Internet Gateway: {igw_id}, ID de la Tabla de Rutas: {route_table_id}, ID del Security Group: {sg_id}, ID de la Instancia: {instance_id}")
