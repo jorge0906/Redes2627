@@ -37,6 +37,16 @@ SUBNET_ID=$(aws ec2 create-subnet \
 --output text) 
 echo "Subnet: $SUBNET_ID ($AZ)"
 
+#Crear Subnet privada
+SUBNET_ID2=$(aws ec2 create-subnet \
+--vpc-id $VPC_ID \
+--cidr-block $PRIVATESUBNET_CIDR \
+--availability-zone $AZ \
+--query 'Subnet.SubnetId' \
+--tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Script-Subnet2},{Key=Type,Value=prueba}]' \
+--output text)
+echo "Subnet: $SUBNET_ID2 ($AZ)"
+
 # Crear Internet Gateway y asociarlo a la VPC
 IGW_ID=$(aws ec2 create-internet-gateway \
 --query 'InternetGateway.InternetGatewayId' \
