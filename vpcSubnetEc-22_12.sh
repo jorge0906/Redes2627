@@ -56,6 +56,14 @@ echo "Internet Gateway: $IGW_ID"
 
 aws ec2 attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
 
+# Crear Nat Gateway en la Subnet publica
+EIP_ALLOC_ID=$(aws ec2 allocate-address \
+--domain vpc \
+--query 'AllocationId' \
+--output text)
+echo "Elastic IP Allocation ID: $EIP_ALLOC_ID"
+
+
 # Crear tabla de rutas y asociarla a la subnet
 ROUTE_TABLE_ID=$(aws ec2 create-route-table \
 --vpc-id $VPC_ID \
