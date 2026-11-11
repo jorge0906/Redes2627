@@ -93,10 +93,10 @@ aws ec2 authorize-security-group-ingress \
 --cidr 0.0.0.0/0 
 
 
-#Crear intancia EC2
+#Crear intancia EC2 de la subnet publica
 INSTANCE_ID=$(aws ec2 run-instances \
 --image-id ami-0b6d9d3d33ba97d99 \
---count 1 --instance-type t2.micro \
+--count 1 --instance-type t3.micro \
 --key-name vockey --subnet-id $SUBNET_ID \
 --private-ip-address $EC2_PRIVATE_IP \
 --query 'Instances[0].InstanceId' \
@@ -104,7 +104,20 @@ INSTANCE_ID=$(aws ec2 run-instances \
 --security-group-ids $SG_ID \
 --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance},{Key=Type,Value=prueba}]' \
 --output text) 
-echo "Instancia EC2: $INSTANCE_ID (IP privada $EC2_PRIVATE_IP)"
+echo "Instancia EC2: $INSTANCE_ID (IP privada $EC2_PUBLIC_IP)"
+
+#Crear intancia EC2 de la subnet privada
+INSTANCE_ID2=$(aws ec2 run-instances \
+--image-id ami-0b6d9d3d33ba97d99 \
+--count 1 --instance-type t3.micro \
+--key-name vockey --subnet-id $SUBNET_ID2 \
+--private-ip-address $EC2_PRIVATESUBNET_IP \
+--query 'Instances[0].InstanceId' \
+--associate-public-ip-address \
+--security-group-ids $SG_ID \
+--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance2},{Key=Type,Value=prueba}]' \
+--output text)
+echo "Instancia EC2: $INSTANCE_ID2 (IP privada $EC2_PRIVATESUBNET_IP)"      
 
 
 
