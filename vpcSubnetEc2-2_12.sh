@@ -183,10 +183,5 @@ echo "Subnet privada:       $SUBNET_ID2 ($PRIVATESUBNET_CIDR) -> NAT $NAT_GW_ID"
 echo "EC2 publica:          $INSTANCE_ID (privada $EC2_PUBLIC_IP / publica $PUBLIC_IP)"
 echo "EC2 privada:          $INSTANCE_ID2 (privada $EC2_PRIVATE_IP, sin IP publica)"
 echo ""
-echo "Prueba de comunicacion interna (desde la publica, por SSH):"
-echo "  ssh -i vockey.pem ec2-user@$PUBLIC_IP"
-echo "  ping -c 4 $EC2_PRIVATE_IP"
-echo "Prueba de salida a Internet desde la privada (por el NAT):"
-echo "  ping -c 4 8.8.8.8"
 
 exit 0

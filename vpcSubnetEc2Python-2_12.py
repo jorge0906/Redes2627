@@ -266,8 +266,3 @@ if __name__ == "__main__":
     print(f"EC2 publica:     {instance_public_id} (privada {EC2_PUBLIC_IP} / publica {public_ip})")
     print(f"EC2 privada:     {instance_private_id} (privada {EC2_PRIVATE_IP}, sin IP publica)")
     print()
-    print("Prueba de comunicacion interna (desde la publica, por SSH):")
-    print(f"  ssh -i vockey.pem ec2-user@{public_ip}")
-    print(f"  ping -c 4 {EC2_PRIVATE_IP}")
-    print("Prueba de salida a Internet desde la privada (por el NAT):")
-    print("  ping -c 4 8.8.8.8")
