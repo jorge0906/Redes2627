@@ -1,53 +1,55 @@
 #!/bin/bash
 
-#Tarea 2_11 Redes
+#Tarea 2_12 Redes
 #Jorge Escrich Laorden
 
 # Direccionamiento usado en el script
 VPC_CIDR="172.16.0.0/16"
 PUBLICSUBNET_CIDR="172.16.0.0/20"
 PRIVATESUBNET_CIDR="172.16.64.0/20"
-EC2_PRIVATE_IP="172.16.0.100"
 
-EC2_PUBLICSUBNET_IP="172.16.0.100/20"
-EC2_PRIVATESUBNET_IP="172.64.0.100/20"
+# IPs privadas de las instancias
+EC2_PUBLIC_IP="172.16.0.100"
+EC2_PRIVATE_IP="172.16.64.100"
+
+
 AZ="us-east-1a"
 
 
-#CREAR 
+#CREAR
 
-
+# 1. VPC
 VPC_ID=$(aws ec2 create-vpc --cidr-block $VPC_CIDR \
 --query 'Vpc.VpcId' \
 --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=Script-VPC},{Key=Type,Value=prueba}]' \
---output text) 
+--output text)
 echo "VPC: $VPC_ID"
 
 #Dns support and DNS hostnames
 aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support "{\"Value\":true}"
 aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames "{\"Value\":true}"
 
-#Crear Subnet publica
+# 2. Subnet publica
 SUBNET_ID=$(aws ec2 create-subnet \
 --vpc-id $VPC_ID \
 --cidr-block $PUBLICSUBNET_CIDR \
 --availability-zone $AZ \
 --query 'Subnet.SubnetId' \
---tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Script-Subnet},{Key=Type,Value=prueba}]' \
---output text) 
-echo "Subnet: $SUBNET_ID ($AZ)"
+--tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Script-Subnet-Public},{Key=Type,Value=prueba}]' \
+--output text)
+echo "Subnet publica: $SUBNET_ID ($AZ)"
 
-#Crear Subnet privada
+# 3. Subnet privada
 SUBNET_ID2=$(aws ec2 create-subnet \
 --vpc-id $VPC_ID \
 --cidr-block $PRIVATESUBNET_CIDR \
 --availability-zone $AZ \
 --query 'Subnet.SubnetId' \
---tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Script-Subnet2},{Key=Type,Value=prueba}]' \
+--tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=Script-Subnet-Private},{Key=Type,Value=prueba}]' \
 --output text)
-echo "Subnet: $SUBNET_ID2 ($AZ)"
+echo "Subnet privada: $SUBNET_ID2 ($AZ)"
 
-# Crear Internet Gateway y asociarlo a la VPC
+# 4. Internet Gateway y asociarlo a la VPC
 IGW_ID=$(aws ec2 create-internet-gateway \
 --query 'InternetGateway.InternetGatewayId' \
 --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=Script-IGW},{Key=Type,Value=prueba}]' \
@@ -56,35 +58,60 @@ echo "Internet Gateway: $IGW_ID"
 
 aws ec2 attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
 
-# Crear Nat Gateway en la Subnet publica
-EIP_ALLOC_ID=$(aws ec2 allocate-address \
---domain vpc \
---query 'AllocationId' \
---output text)
-echo "Elastic IP Allocation ID: $EIP_ALLOC_ID"
-
-
-# Crear tabla de rutas y asociarla a la subnet
+# 5. Tabla de rutas PUBLICA: salida directa por el Internet Gateway
 ROUTE_TABLE_ID=$(aws ec2 create-route-table \
 --vpc-id $VPC_ID \
 --query 'RouteTable.RouteTableId' \
---tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=Script-RouteTable},{Key=Type,Value=prueba}]' \
+--tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=Script-RouteTable-Public},{Key=Type,Value=prueba}]' \
 --output text)
-echo "Tabla de rutas: $ROUTE_TABLE_ID"
+echo "Tabla de rutas publica: $ROUTE_TABLE_ID"
 
-# Ruta por defecto hacia el Internet Gateway
 aws ec2 create-route \
 --route-table-id $ROUTE_TABLE_ID \
 --destination-cidr-block 0.0.0.0/0 \
 --gateway-id $IGW_ID
 
-# Asociar la tabla de rutas a la subnet
 aws ec2 associate-route-table \
 --route-table-id $ROUTE_TABLE_ID \
 --subnet-id $SUBNET_ID
 
+# 6. NAT Gateway en la subnet publica
+EIP_ALLOC_ID=$(aws ec2 allocate-address \
+--domain vpc \
+--query 'AllocationId' \
+--tag-specifications 'ResourceType=elastic-ip,Tags=[{Key=Name,Value=Script-EIP-NAT},{Key=Type,Value=prueba}]' \
+--output text)
+echo "Elastic IP Allocation ID: $EIP_ALLOC_ID"
 
-# Crear Security Group
+NAT_GW_ID=$(aws ec2 create-nat-gateway \
+--subnet-id $SUBNET_ID \
+--allocation-id $EIP_ALLOC_ID \
+--query 'NatGateway.NatGatewayId' \
+--tag-specifications 'ResourceType=natgateway,Tags=[{Key=Name,Value=Script-NATGW},{Key=Type,Value=prueba}]' \
+--output text)
+echo "NAT Gateway: $NAT_GW_ID"
+
+echo "Esperando a que el NAT Gateway este disponible..."
+aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_GW_ID
+
+# 7. Tabla de rutas PRIVADA: salida a Internet a traves del NAT Gateway
+ROUTE_TABLE_ID2=$(aws ec2 create-route-table \
+--vpc-id $VPC_ID \
+--query 'RouteTable.RouteTableId' \
+--tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=Script-RouteTable-Private},{Key=Type,Value=prueba}]' \
+--output text)
+echo "Tabla de rutas privada: $ROUTE_TABLE_ID2"
+
+aws ec2 create-route \
+--route-table-id $ROUTE_TABLE_ID2 \
+--destination-cidr-block 0.0.0.0/0 \
+--nat-gateway-id $NAT_GW_ID
+
+aws ec2 associate-route-table \
+--route-table-id $ROUTE_TABLE_ID2 \
+--subnet-id $SUBNET_ID2
+
+# 8. Security Group
 SG_ID=$(aws ec2 create-security-group \
 --group-name Script-SG \
 --description "Security group for Script" \
@@ -94,42 +121,72 @@ SG_ID=$(aws ec2 create-security-group \
 --output text)
 echo "Security Group: $SG_ID"
 
+# SSH desde cualquier IP (para poder conectarnos a la instancia publica)
 aws ec2 authorize-security-group-ingress \
 --group-id $SG_ID \
 --protocol tcp \
 --port 22 \
---cidr 0.0.0.0/0 
+--cidr 0.0.0.0/0
+
+# Comunicacion entre las dos instancias
+aws ec2 authorize-security-group-ingress \
+--group-id $SG_ID \
+--protocol tcp \
+--port 22 \
+--source-group $SG_ID
 
 
-#Crear intancia EC2 de la subnet publica
+aws ec2 authorize-security-group-ingress \
+--group-id $SG_ID \
+--protocol icmp \
+--port -1 \
+--source-group $SG_ID
+
+# 9. Instancia EC2 de la subnet PUBLICA (con IP publica y salida por IGW)
 INSTANCE_ID=$(aws ec2 run-instances \
 --image-id ami-0b6d9d3d33ba97d99 \
 --count 1 --instance-type t3.micro \
 --key-name vockey --subnet-id $SUBNET_ID \
---private-ip-address $EC2_PRIVATE_IP \
---query 'Instances[0].InstanceId' \
+--private-ip-address $EC2_PUBLIC_IP \
 --associate-public-ip-address \
 --security-group-ids $SG_ID \
---tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance},{Key=Type,Value=prueba}]' \
---output text) 
-echo "Instancia EC2: $INSTANCE_ID (IP privada $EC2_PUBLIC_IP)"
+--query 'Instances[0].InstanceId' \
+--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance-Public},{Key=Type,Value=prueba}]' \
+--output text)
+echo "Instancia EC2 publica: $INSTANCE_ID (IP privada $EC2_PUBLIC_IP)"
 
-#Crear intancia EC2 de la subnet privada
+# 10. Instancia EC2 de la subnet PRIVADA (sin IP publica, salida por NAT)
 INSTANCE_ID2=$(aws ec2 run-instances \
 --image-id ami-0b6d9d3d33ba97d99 \
 --count 1 --instance-type t3.micro \
 --key-name vockey --subnet-id $SUBNET_ID2 \
---private-ip-address $EC2_PRIVATESUBNET_IP \
---query 'Instances[0].InstanceId' \
---associate-public-ip-address \
+--private-ip-address $EC2_PRIVATE_IP \
 --security-group-ids $SG_ID \
---tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance2},{Key=Type,Value=prueba}]' \
+--query 'Instances[0].InstanceId' \
+--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Script-Instance-Private},{Key=Type,Value=prueba}]' \
 --output text)
-echo "Instancia EC2: $INSTANCE_ID2 (IP privada $EC2_PRIVATESUBNET_IP)"      
+echo "Instancia EC2 privada: $INSTANCE_ID2 (IP privada $EC2_PRIVATE_IP)"
 
+# Esperar a que ambas esten en ejecucion
+echo "Esperando a que las instancias esten running..."
+aws ec2 wait instance-running --instance-ids $INSTANCE_ID $INSTANCE_ID2
 
+# Resumen final
+PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID \
+--query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
 
-
-
+echo ""
+echo "===== RESUMEN ====="
+echo "VPC:                  $VPC_ID ($VPC_CIDR)"
+echo "Subnet publica:       $SUBNET_ID ($PUBLICSUBNET_CIDR) -> IGW $IGW_ID"
+echo "Subnet privada:       $SUBNET_ID2 ($PRIVATESUBNET_CIDR) -> NAT $NAT_GW_ID"
+echo "EC2 publica:          $INSTANCE_ID (privada $EC2_PUBLIC_IP / publica $PUBLIC_IP)"
+echo "EC2 privada:          $INSTANCE_ID2 (privada $EC2_PRIVATE_IP, sin IP publica)"
+echo ""
+echo "Prueba de comunicacion interna (desde la publica, por SSH):"
+echo "  ssh -i vockey.pem ec2-user@$PUBLIC_IP"
+echo "  ping -c 4 $EC2_PRIVATE_IP"
+echo "Prueba de salida a Internet desde la privada (por el NAT):"
+echo "  ping -c 4 8.8.8.8"
 
 exit 0
